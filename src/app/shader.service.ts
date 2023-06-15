@@ -6,14 +6,15 @@ import { firstValueFrom } from 'rxjs';
   providedIn: 'root'
 })
 export class ShaderService {
+  workgroupSize: number = 8
   renderCode: string = ""
   computeCode: string = ""
 
   constructor(private http: HttpClient) {}
 
   async getCode() {
-    this.renderCode = await firstValueFrom(this.http.get('shaders/draw.wgsl', {responseType: 'text'}))
-    this.computeCode = await firstValueFrom(this.http.get('shaders/compute.wgsl', {responseType: 'text'}))
+    this.renderCode = await firstValueFrom(this.http.get('shaders/render.wgsl', {responseType: 'text'}))
+    this.computeCode = (await firstValueFrom(this.http.get('shaders/compute.wgsl', {responseType: 'text'}))).replace(/WORKGROUP_SIZE/g, this.workgroupSize.toString())
   }
 
   async initWebGPUContext(canvas: HTMLCanvasElement) {

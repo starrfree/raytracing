@@ -12,6 +12,7 @@ export class SceneCanvasComponent implements OnInit {
     return this.canvasElement.nativeElement
   }
   raysPerPixel: number = 1
+  computesPerFrame: number = 1
 
   constructor(private shaderService: ShaderService) { }
 
@@ -25,18 +26,52 @@ export class SceneCanvasComponent implements OnInit {
     if (!prop) { return }
     let { device, context } = prop
     let { computeShaderModule, renderShaderModule } = this.shaderService.createShaderModule(device)
-    let uniformBuffers = this.createUniformBuffers(
-      device,
-      []
-      )
+    let uniformBuffers = this.createUniformBuffers(device, [
+      { name: "grid", array: new Float32Array([this.canvas.width * this.raysPerPixel, this.canvas.height * this.raysPerPixel]) },
+    ])
     let rayBuffers = this.createRayBuffers(device)
     let bindings = this.getBindGroups(device, uniformBuffers, rayBuffers as [GPUBuffer, GPUBuffer])
     let computePipeline = this.createComputePipeline(device, computeShaderModule, bindings.layout)
+
+    let params = { step: 0 }
+    let frames = 0
+    let startTime = performance.now()
+    let render = () => {
+      this.frame(device, computePipeline, bindings.groups, params)
+      if (performance.now() - startTime >= 2000) {
+        console.log("fps: " + frames / 2)
+        startTime = performance.now()
+      }
+      frames++
+      // requestAnimationFrame(render)
+    }
+    render()
   }
 
   resizeCanvas() {
     this.canvas.width = this.canvas.clientWidth
     this.canvas.height = this.canvas.clientHeight
+  }
+
+  frame(device: GPUDevice, computePipeline: GPUComputePipeline, bindGroups: GPUBindGroup[], params: { step: number }) {
+    let encoder = device.createCommandEncoder()
+
+    for (let i = 0; i < this.computesPerFrame; i++) {
+      this.compute(encoder, computePipeline, bindGroups[params.step % 2])
+      params.step++
+    }
+
+    device.queue.submit([encoder.finish()])
+  }
+
+  compute(encoder: GPUCommandEncoder, pipeline: GPUComputePipeline, bindGroup: GPUBindGroup) {
+    let computePass = encoder.beginComputePass()
+    computePass.setPipeline(pipeline)
+    computePass.setBindGroup(0, bindGroup)
+    let width = Math.ceil(this.canvas.width * this.raysPerPixel / this.shaderService.workgroupSize)
+    let height = Math.ceil(this.canvas.height * this.raysPerPixel / this.shaderService.workgroupSize)
+    computePass.dispatchWorkgroups(width, height)
+    computePass.end()
   }
 
   createUniformBuffers(device: GPUDevice, uniforms: { name: string, array: Float32Array }[]) {
@@ -112,22 +147,22 @@ export class SceneCanvasComponent implements OnInit {
       resource: { buffer: rayBuffers[0] }
     })
     bindGroupEntries1.push({
-      binding: uniformBuffers.length,
+      binding: uniformBuffers.length + 1,
       resource: { buffer: rayBuffers[1] }
     })
     let bindGroupEntries2: GPUBindGroupEntry[] = []
     uniformBuffers.forEach((buffer, i) => {
-      bindGroupEntries1.push({
+      bindGroupEntries2.push({
         binding: i,
         resource: { buffer: buffer }
       })
     })
-    bindGroupEntries1.push({
+    bindGroupEntries2.push({
       binding: uniformBuffers.length,
       resource: { buffer: rayBuffers[1] }
     })
-    bindGroupEntries1.push({
-      binding: uniformBuffers.length,
+    bindGroupEntries2.push({
+      binding: uniformBuffers.length + 1,
       resource: { buffer: rayBuffers[0] }
     })
     let bindGroups = [
