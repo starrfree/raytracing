@@ -19,47 +19,52 @@ export class SceneCanvasComponent implements OnInit {
   ngOnInit(): void {
   }
 
+  resizeCanvas() {
+    this.canvas.width = this.canvas.clientWidth / 10
+    this.canvas.height = this.canvas.clientHeight / 10
+  }
   async ngAfterViewInit() {
     this.resizeCanvas()
     await this.shaderService.getCode()
     let prop = await this.shaderService.initWebGPUContext(this.canvas)
     if (!prop) { return }
-    let { device, context } = prop
+    let { device, context, canvasFormat } = prop
     let { computeShaderModule, renderShaderModule } = this.shaderService.createShaderModule(device)
-    let uniformBuffers = this.createUniformBuffers(device, [
+    let uniforms = [
       { name: "grid", array: new Float32Array([this.canvas.width * this.raysPerPixel, this.canvas.height * this.raysPerPixel]) },
-    ])
+      { name: "canvas", array: new Float32Array([this.canvas.width, this.canvas.height]) },
+    ]
+    let uniformBuffers = this.createUniformBuffers(device, uniforms)
     let rayBuffers = this.createRayBuffers(device)
     let bindings = this.getBindGroups(device, uniformBuffers, rayBuffers as [GPUBuffer, GPUBuffer])
     let computePipeline = this.createComputePipeline(device, computeShaderModule, bindings.layout)
+    let vertexBuffer = this.createVertexBuffer(device)
+    let renderPipeline = this.createRenderPipeline(device, canvasFormat, renderShaderModule, bindings.layout)
 
     let params = { step: 0 }
     let frames = 0
     let startTime = performance.now()
     let render = () => {
-      this.frame(device, computePipeline, bindings.groups, params)
-      if (performance.now() - startTime >= 2000) {
-        console.log("fps: " + frames / 2)
+      this.frame(device, context, computePipeline, renderPipeline, vertexBuffer, bindings.groups, params)
+      if (performance.now() - startTime >= 1000) {
+        console.log("fps: " + frames)
         startTime = performance.now()
+        frames = 0
       }
       frames++
-      // requestAnimationFrame(render)
+      requestAnimationFrame(render)
     }
     render()
   }
 
-  resizeCanvas() {
-    this.canvas.width = this.canvas.clientWidth
-    this.canvas.height = this.canvas.clientHeight
-  }
-
-  frame(device: GPUDevice, computePipeline: GPUComputePipeline, bindGroups: GPUBindGroup[], params: { step: number }) {
+  frame(device: GPUDevice, context: GPUCanvasContext, computePipeline: GPUComputePipeline, renderPipeline: GPURenderPipeline, vertexBuffer: GPUBuffer, bindGroups: GPUBindGroup[], params: { step: number }) {
     let encoder = device.createCommandEncoder()
 
     for (let i = 0; i < this.computesPerFrame; i++) {
       this.compute(encoder, computePipeline, bindGroups[params.step % 2])
       params.step++
     }
+    this.render(encoder, renderPipeline, bindGroups[params.step % 2], context, vertexBuffer)
 
     device.queue.submit([encoder.finish()])
   }
@@ -72,6 +77,22 @@ export class SceneCanvasComponent implements OnInit {
     let height = Math.ceil(this.canvas.height * this.raysPerPixel / this.shaderService.workgroupSize)
     computePass.dispatchWorkgroups(width, height)
     computePass.end()
+  }
+
+  render(encoder: GPUCommandEncoder, pipeline: GPURenderPipeline, bindGroup: GPUBindGroup, context: GPUCanvasContext, vertexBuffer: GPUBuffer) {
+    let renderPass = encoder.beginRenderPass({
+      colorAttachments: [{
+         view: context.getCurrentTexture().createView(),
+         loadOp: 'clear',
+         storeOp: 'store',
+         clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 }
+      }]
+    })
+    renderPass.setVertexBuffer(0, vertexBuffer)
+    renderPass.setBindGroup(0, bindGroup)
+    renderPass.setPipeline(pipeline)
+    renderPass.draw(6)
+    renderPass.end()
   }
 
   createUniformBuffers(device: GPUDevice, uniforms: { name: string, array: Float32Array }[]) {
@@ -111,18 +132,37 @@ export class SceneCanvasComponent implements OnInit {
     return storage
   }
 
+  createVertexBuffer(device: GPUDevice) {
+    let vertices = new Float32Array([
+      -1, -1,
+       1, -1,
+       1,  1,
+    
+      -1, -1,
+       1,  1,
+      -1,  1,
+    ])
+    let buffer = device.createBuffer({
+      label: "vertex buffer",
+      size: vertices.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+    })
+    device.queue.writeBuffer(buffer, 0, vertices)
+    return buffer
+  }
+
   getBindGroups(device: GPUDevice, uniformBuffers: GPUBuffer[], rayBuffers: [GPUBuffer, GPUBuffer]) {
     let layoutEntries: GPUBindGroupLayoutEntry[] = []
     uniformBuffers.forEach((buffer, i) => {
       layoutEntries.push({
         binding: i,
-        visibility: GPUShaderStage.VERTEX | GPUShaderStage.COMPUTE,
+        visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE,
         buffer: {}
       })
     })
     layoutEntries.push({
       binding: uniformBuffers.length,
-      visibility: GPUShaderStage.VERTEX | GPUShaderStage.COMPUTE,
+      visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE,
       buffer: {type: 'read-only-storage'}
     })
     layoutEntries.push({
@@ -195,6 +235,50 @@ export class SceneCanvasComponent implements OnInit {
         module: shaderModule,
         entryPoint: "main"
       }
+    })
+    return pipeline
+  }
+
+  createRenderPipeline(device: GPUDevice, canvasFormat: GPUTextureFormat, shaderModule: GPUShaderModule, bindGroupLayout: GPUBindGroupLayout) {
+    let layout = device.createPipelineLayout({
+      label: "render pipeline layout",
+      bindGroupLayouts: [bindGroupLayout]
+    })
+    let vertexLayout: GPUVertexBufferLayout = {
+      arrayStride: 8,
+      attributes: [{
+        format: 'float32x2',
+        offset: 0,
+        shaderLocation: 0,
+      }],
+    }
+    let pipeline = device.createRenderPipeline({
+      label: "render pipeline",
+      layout: layout,
+      vertex: {
+        module: shaderModule,
+        entryPoint: "vertexMain",
+        buffers: [vertexLayout]
+      },
+      fragment: {
+        module: shaderModule,
+        entryPoint: "fragmentMain",
+        targets: [{
+          format: canvasFormat,
+          blend: {
+            color: {
+              srcFactor: 'src-alpha',
+              dstFactor: 'one-minus-src-alpha',
+              operation: 'add',
+            },
+            alpha: {
+              srcFactor: 'src-alpha',
+              dstFactor: 'one-minus-src-alpha',
+              operation: 'add',
+            },
+          },
+        }],
+      },
     })
     return pipeline
   }

@@ -34,7 +34,7 @@ export class ShaderService {
       device: device,
       format: canvasFormat,
     })
-    return { device: device, context: context }
+    return { device: device, context: context, canvasFormat: canvasFormat }
   }
 
   createShaderModule(device: GPUDevice) {
