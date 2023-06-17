@@ -12,7 +12,8 @@ export class SceneCanvasComponent implements OnInit {
     return this.canvasElement.nativeElement
   }
   raysPerPixel: number = 1
-  computesPerFrame: number = 1
+  computesPerFrame: number = 10
+  targetFrames: number = 1000
 
   constructor(private shaderService: ShaderService) { }
 
@@ -20,8 +21,8 @@ export class SceneCanvasComponent implements OnInit {
   }
 
   resizeCanvas() {
-    this.canvas.width = this.canvas.clientWidth / 10
-    this.canvas.height = this.canvas.clientHeight / 10
+    this.canvas.width = this.canvas.clientWidth / 2
+    this.canvas.height = this.canvas.clientHeight / 2
   }
   async ngAfterViewInit() {
     this.resizeCanvas()
@@ -31,8 +32,10 @@ export class SceneCanvasComponent implements OnInit {
     let { device, context, canvasFormat } = prop
     let { computeShaderModule, renderShaderModule } = this.shaderService.createShaderModule(device)
     let uniforms = [
+      { name: "time", array: new Float32Array([0]) },
       { name: "grid", array: new Float32Array([this.canvas.width * this.raysPerPixel, this.canvas.height * this.raysPerPixel]) },
       { name: "canvas", array: new Float32Array([this.canvas.width, this.canvas.height]) },
+      { name: "target_frames", array: new Float32Array([this.targetFrames]) },
     ]
     let uniformBuffers = this.createUniformBuffers(device, uniforms)
     let rayBuffers = this.createRayBuffers(device)
@@ -45,22 +48,25 @@ export class SceneCanvasComponent implements OnInit {
     let frames = 0
     let startTime = performance.now()
     let render = () => {
-      this.frame(device, context, computePipeline, renderPipeline, vertexBuffer, bindings.groups, params)
+      this.frame(device, context, computePipeline, renderPipeline, vertexBuffer, bindings.groups, uniformBuffers, params)
       if (performance.now() - startTime >= 1000) {
         console.log("fps: " + frames)
         startTime = performance.now()
         frames = 0
       }
       frames++
-      requestAnimationFrame(render)
+      if (params.step < this.targetFrames) {
+        requestAnimationFrame(render)
+      }
     }
     render()
   }
 
-  frame(device: GPUDevice, context: GPUCanvasContext, computePipeline: GPUComputePipeline, renderPipeline: GPURenderPipeline, vertexBuffer: GPUBuffer, bindGroups: GPUBindGroup[], params: { step: number }) {
+  frame(device: GPUDevice, context: GPUCanvasContext, computePipeline: GPUComputePipeline, renderPipeline: GPURenderPipeline, vertexBuffer: GPUBuffer, bindGroups: GPUBindGroup[], uniformBuffers: GPUBuffer[], params: { step: number }) {
     let encoder = device.createCommandEncoder()
 
     for (let i = 0; i < this.computesPerFrame; i++) {
+      device.queue.writeBuffer(uniformBuffers[0], 0, new Float32Array([params.step / 1000]))
       this.compute(encoder, computePipeline, bindGroups[params.step % 2])
       params.step++
     }

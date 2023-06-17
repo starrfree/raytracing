@@ -19,12 +19,12 @@ export class ShaderService {
 
   async initWebGPUContext(canvas: HTMLCanvasElement) {
     if (!navigator.gpu) {
-      alert("WebGPU not supported on this browser.")
+      alert("WebGPU not supported on this browser. Try downloading the latest version of Google Chrome.")
       return
     }
     let adapter = (await navigator.gpu.requestAdapter())!
     if (!adapter) {
-      alert("No appropriate GPUAdapter found.")
+      alert("No appropriate GPU adapter found.")
       return
     }
     let device = await adapter.requestDevice()
