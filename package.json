@@ -18,11 +18,8 @@
     "@angular/platform-browser": "~13.2.0",
     "@angular/platform-browser-dynamic": "~13.2.0",
     "@angular/router": "~13.2.0",
-    "@types/three": "^0.152.1",
     "@webgpu/types": "^0.1.33",
-    "camera-controls": "^2.5.0",
     "rxjs": "~7.5.0",
-    "three": "^0.153.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.11.4"
   },
