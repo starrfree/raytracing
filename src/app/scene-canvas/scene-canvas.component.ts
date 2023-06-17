@@ -12,8 +12,8 @@ export class SceneCanvasComponent implements OnInit {
     return this.canvasElement.nativeElement
   }
   raysPerPixel: number = 1
-  computesPerFrame: number = 10
-  targetFrames: number = 1000
+  computesPerFrame: number = 1
+  targetFrames: number = 1
 
   constructor(private shaderService: ShaderService) { }
 
@@ -64,21 +64,17 @@ export class SceneCanvasComponent implements OnInit {
 
   frame(device: GPUDevice, context: GPUCanvasContext, computePipeline: GPUComputePipeline, renderPipeline: GPURenderPipeline, vertexBuffer: GPUBuffer, bindGroups: GPUBindGroup[], uniformBuffers: GPUBuffer[], params: { step: number }) {
     let encoder = device.createCommandEncoder()
-
-    for (let i = 0; i < this.computesPerFrame; i++) {
-      device.queue.writeBuffer(uniformBuffers[0], 0, new Float32Array([params.step / 1000]))
-      this.compute(encoder, computePipeline, bindGroups[params.step % 2])
-      params.step++
-    }
+    device.queue.writeBuffer(uniformBuffers[0], 0, new Float32Array([params.step / this.targetFrames]))
+    this.compute(encoder, computePipeline, bindGroups[params.step % 2])
+    params.step++
     this.render(encoder, renderPipeline, bindGroups[params.step % 2], context, vertexBuffer)
-
     device.queue.submit([encoder.finish()])
   }
 
   compute(encoder: GPUCommandEncoder, pipeline: GPUComputePipeline, bindGroup: GPUBindGroup) {
     let computePass = encoder.beginComputePass()
-    computePass.setPipeline(pipeline)
     computePass.setBindGroup(0, bindGroup)
+    computePass.setPipeline(pipeline)
     let width = Math.ceil(this.canvas.width * this.raysPerPixel / this.shaderService.workgroupSize)
     let height = Math.ceil(this.canvas.height * this.raysPerPixel / this.shaderService.workgroupSize)
     computePass.dispatchWorkgroups(width, height)
