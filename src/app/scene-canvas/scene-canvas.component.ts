@@ -23,23 +23,23 @@ export class SceneCanvasComponent implements OnInit {
     ),
     new Sphere(
       [0, -21, 5], 20,
-      new Material([1, 1, 1], 0, 0.8, 0)
+      new Material([1, 1, 1], 0, 0.8, 1)
     ),
     new Sphere(
       [0, 0, 5], 1,
-      new Material([1, 0.5, 0.5], 0, 0.8, 0)
+      new Material([1, 0.5, 0.5], 0, 0, 0.1)
     ),
     new Sphere(
       [-2, -0.5, 5], 0.6,
-      new Material([0.5, 1, 0.5], 0, 0.8, 0)
+      new Material([0.5, 1, 0.5], 0, 0.2, 0.1)
     ),
     new Sphere(
       [-0.9, -0.6, 4], 0.4,
-      new Material([0.5, 0.5, 1], 0, 0.8, 0)
+      new Material([0.5, 0.5, 1], 0, 1, 0)
     ),
     new Sphere(
       [-0.2, -0.7, 3.8], 0.3,
-      new Material([1, 1, 1], 0, 0, 0)
+      new Material([1, 1, 1], 0, 0, 1)
     )
   ]
 

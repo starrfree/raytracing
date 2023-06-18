@@ -73,9 +73,16 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
         ray.origin = hit.position;
         let seed = ((index + u32(time * grid.x * grid.y)) * u32(ray_count) + u32(i)) * u32(max_bounces) + u32(bounce);
 
-        ray.direction = random_on_hemisphere(seed, hit.normal) * hit.material.roughness + (1 - hit.material.roughness) * reflect(ray.direction, hit.normal);
+        let is_specular = random(seed) > hit.material.specular_probability;
+        if (is_specular) {
+          ray.direction = random_on_hemisphere(seed, hit.normal);
+        } else {
+          ray.direction = random_on_hemisphere(seed, hit.normal) * hit.material.roughness + (1 - hit.material.roughness) * reflect(ray.direction, hit.normal);
+        }
         ray.light += hit.material.emission * ray.color;
-        ray.color *= hit.material.color;
+        if (is_specular) {
+          ray.color *= hit.material.color;
+        }
         if (hit.material.emission >= 1) {
           break;
         }
