@@ -1,13 +1,13 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { Sphere } from 'src/types/graphics';
+import { Sphere, Triangle } from 'src/types/graphics';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ShaderService {
-  workgroupSize: number = 8
+  workgroupSize: number = 4
   renderCode: string = ""
   computeCode: string = ""
 
@@ -81,11 +81,11 @@ export class ShaderService {
     return buffers
   }
 
-  flattenSpheres(spheres: Sphere[]) {
-    let flatSpheres: number[] = []
-    for (let sphere of spheres) {
-      flatSpheres.push(...sphere.flat)
+  flatten(shapes: (Sphere | Triangle)[]) {
+    let flat: number[] = []
+    for (let shape of shapes) {
+      flat.push(...shape.flat)
     }
-    return new Float32Array(flatSpheres)
+    return new Float32Array(flat)
   }
 }

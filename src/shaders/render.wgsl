@@ -6,9 +6,11 @@ struct VertexOutput {
   @builtin(position) pos: vec4f,
 };
 
+@group(0) @binding(0) var<uniform> time: f32;
 @group(0) @binding(1) var<uniform> grid: vec2f;
 @group(0) @binding(2) var<uniform> canvas: vec2f;
-@group(0) @binding(7) var<storage> colors: array<vec4f>;
+@group(0) @binding(3) var<uniform> target_frames: f32;
+@group(0) @binding(9) var<storage> colors: array<vec4f>;
 
 @vertex
 fn vertexMain(input: VertexInput) -> VertexOutput {
@@ -32,6 +34,6 @@ fn fragmentMain(input: FragInput) -> @location(0) vec4f {
       color = color + colors[index + i * u32(grid.x) + j];
     }
   }
-  color = color / f32(pp * pp);
+  color = color / f32(pp * pp) * ((target_frames - (time + 1)) / (time + 1) + 1);
   return color;
 }

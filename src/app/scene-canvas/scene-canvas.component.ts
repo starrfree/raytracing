@@ -1,7 +1,8 @@
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { ShaderService } from '../shader.service';
-import { Sphere, Material } from 'src/types/graphics';
+import { Sphere, Material, Triangle } from 'src/types/graphics';
 import { mat4, vec3 } from 'gl-matrix'
+import * as Utils from 'src/assets/utils/graphics';
 
 @Component({
   selector: 'app-scene-canvas',
@@ -15,7 +16,7 @@ export class SceneCanvasComponent implements OnInit {
   }
   raysPerPixel: number = 2
   computesPerFrame: number = 1
-  targetFrames: number = 400
+  targetFrames: number = 300
   
   spheres: Sphere[] = [
     new Sphere(
@@ -34,14 +35,19 @@ export class SceneCanvasComponent implements OnInit {
       [-0.5, -0.5, 5], 0.6,
       new Material([0.5, 1, 0.5], 0, 0.2, 0.1)
     ),
-    new Sphere(
-      [0.6, -0.6, 4], 0.4,
-      new Material([0.5, 0.5, 1], 0, 1, 0)
-    ),
+    // new Sphere(
+    //   [0.6, -0.6, 4], 0.4,
+    //   new Material([0.5, 0.5, 1], 0, 1, 0)
+    // ),
     new Sphere(
       [1.3, -0.7, 3.8], 0.3,
       new Material([1, 1, 1], 0, 0, 1)
     )
+  ]
+
+  triangle: Triangle[] = [
+    // new Triangle([0, 0, 0], [0, 0, 0], [0, 0, 0], new Material([1, 1, 1], 0, 0, 0)),
+    ...Utils.createCube([0.5, -0.7, 4], [-0.07, 0.4, 0], 0.7, new Material([0.5, 0.5, 1], 0, 1, 0))
   ]
 
   constructor(private shaderService: ShaderService) { }
@@ -50,8 +56,8 @@ export class SceneCanvasComponent implements OnInit {
   }
 
   resizeCanvas() {
-    this.canvas.width = this.canvas.clientWidth / 2
-    this.canvas.height = this.canvas.clientHeight / 2
+    this.canvas.width = this.canvas.clientWidth
+    this.canvas.height = this.canvas.clientHeight
   }
   async ngAfterViewInit() {
     this.resizeCanvas()
@@ -66,10 +72,12 @@ export class SceneCanvasComponent implements OnInit {
       { name: "canvas", array: new Float32Array([this.canvas.width, this.canvas.height]) },
       { name: "target_frames", array: new Float32Array([this.targetFrames]) },
       { name: "sphere_count", array: new Float32Array([this.spheres.length]) },
+      { name: "triangle_count", array: new Float32Array([this.triangle.length]) },
       { name: "scene_transform", array: new Float32Array(this.getSceneTransform()) },
     ]
     let storage = [
-      { name: "spheres", array: this.shaderService.flattenSpheres(this.spheres) }
+      { name: "spheres", array: this.shaderService.flatten(this.spheres) },
+      { name: "triangles", array: this.shaderService.flatten(this.triangle) },
     ]
     let uniformBuffers = this.shaderService.createUniformBuffers(device, uniforms)
     let storageBuffers = this.shaderService.createStorageBuffers(device, storage)
@@ -92,6 +100,8 @@ export class SceneCanvasComponent implements OnInit {
       frames++
       if (params.step < this.targetFrames) {
         requestAnimationFrame(render)
+      } else {
+        console.log("done")
       }
     }
     render()

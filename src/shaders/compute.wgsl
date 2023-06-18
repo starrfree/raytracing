@@ -3,10 +3,12 @@
 @group(0) @binding(2) var<uniform> canvas: vec2f;
 @group(0) @binding(3) var<uniform> target_frames: f32;
 @group(0) @binding(4) var<uniform> sphere_count: f32;
-@group(0) @binding(5) var<uniform> scene_transform: mat4x4f;
-@group(0) @binding(6) var<storage> spheres: array<Sphere>;
-@group(0) @binding(7) var<storage> colorsIn: array<vec4f>;
-@group(0) @binding(8) var<storage, read_write> colorsOut: array<vec4f>;
+@group(0) @binding(5) var<uniform> triangle_count: f32;
+@group(0) @binding(6) var<uniform> scene_transform: mat4x4f;
+@group(0) @binding(7) var<storage> spheres: array<Sphere>;
+@group(0) @binding(8) var<storage> triangles: array<Triangle>;
+@group(0) @binding(9) var<storage> colorsIn: array<vec4f>;
+@group(0) @binding(10) var<storage, read_write> colorsOut: array<vec4f>;
 
 struct Ray {
   origin: vec3f,
@@ -29,6 +31,13 @@ struct Sphere {
   material: Material,
 }
 
+struct Triangle {
+  v0: vec3f,
+  v1: vec3f,
+  v2: vec3f,
+  material: Material,
+}
+
 struct Material {
   color: vec3f,
   emission: f32,
@@ -41,7 +50,7 @@ struct Random {
   seed: u32,
 }
 
-const max_bounces = 1000;
+const max_bounces = 10;
 const ray_count = 10;
 
 const PI = 3.1415926535897932384626433832795;
@@ -69,7 +78,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     ray.light = vec3f(0);
 
     for (var bounce = 0; bounce <= max_bounces; bounce++) {
-      var hit = spheres_intersect(ray);
+      var hit = intersect(ray);
       if (hit.hit) {
         ray.origin = hit.position;
         let seed = ((index + u32(time * grid.x * grid.y)) * u32(ray_count) + u32(i)) * u32(max_bounces) + u32(bounce);
@@ -99,13 +108,26 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   colorsOut[index] = vec4f(color, 1.0);
 }
 
-fn spheres_intersect(ray: Ray) -> HitInfo {
+fn intersect(ray: Ray) -> HitInfo {
   var closest_hit: HitInfo;
   var found = false;
   for (var i = 0; i < i32(sphere_count); i++) {
     var sphere = spheres[i];
     sphere.center = (scene_transform * vec4f(sphere.center, 1)).xyz;
     let hit = sphere_intersect(ray, sphere);
+    if (hit.hit) {
+      if (!found || hit.distance < closest_hit.distance) {
+        closest_hit = hit;
+        found = true;
+      }
+    }
+  }
+  for (var i = 0; i < i32(triangle_count); i++) {
+    var triangle = triangles[i];
+    triangle.v0 = (scene_transform * vec4f(triangle.v0, 1)).xyz;
+    triangle.v1 = (scene_transform * vec4f(triangle.v1, 1)).xyz;
+    triangle.v2 = (scene_transform * vec4f(triangle.v2, 1)).xyz;
+    let hit = triangle_intersect(ray, triangle);
     if (hit.hit) {
       if (!found || hit.distance < closest_hit.distance) {
         closest_hit = hit;
@@ -134,6 +156,39 @@ fn sphere_intersect(ray: Ray, sphere: Sphere) -> HitInfo {
       hit.material = sphere.material;
     }
   }
+  return hit;
+}
+
+fn triangle_intersect(ray: Ray, triangle: Triangle) -> HitInfo {
+  let v0v1 = triangle.v1 - triangle.v0;
+  let v0v2 = triangle.v2 - triangle.v0;
+  let pvec = cross(ray.direction, v0v2);
+  let det = dot(v0v1, pvec);
+  var hit: HitInfo;
+  hit.hit = false;
+  if (det < 0.000001) {
+    return hit;
+  }
+  let invDet = 1 / det;
+  let tvec = ray.origin - triangle.v0;
+  let u = dot(tvec, pvec) * invDet;
+  if (u < 0 || u > 1) {
+    return hit;
+  }
+  let qvec = cross(tvec, v0v1);
+  let v = dot(ray.direction, qvec) * invDet;
+  if (v < 0 || u + v > 1) {
+    return hit;
+  }
+  let t = dot(v0v2, qvec) * invDet;
+  if (t < 0) {
+    return hit;
+  }
+  hit.hit = true;
+  hit.distance = t;
+  hit.position = ray.origin + ray.direction * t;
+  hit.normal = normalize(cross(v0v1, v0v2));
+  hit.material = triangle.material;
   return hit;
 }
 
