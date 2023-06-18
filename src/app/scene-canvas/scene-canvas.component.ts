@@ -1,6 +1,7 @@
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { ShaderService } from '../shader.service';
 import { Sphere, Material } from 'src/types/graphics';
+import { mat4, vec3 } from 'gl-matrix'
 
 @Component({
   selector: 'app-scene-canvas',
@@ -14,31 +15,31 @@ export class SceneCanvasComponent implements OnInit {
   }
   raysPerPixel: number = 2
   computesPerFrame: number = 1
-  targetFrames: number = 200
+  targetFrames: number = 400
   
   spheres: Sphere[] = [
     new Sphere(
-      [3, 2, 2], 2,
+      [4.5, 2, 2], 2,
       new Material([1, 1, 1], 1, 0, 0)
     ),
     new Sphere(
-      [0, -21, 5], 20,
+      [1.5, -21, 5], 20,
       new Material([1, 1, 1], 0, 0.8, 1)
     ),
     new Sphere(
-      [0, 0, 5], 1,
+      [1.5, 0, 5], 1,
       new Material([1, 0.5, 0.5], 0, 0, 0.1)
     ),
     new Sphere(
-      [-2, -0.5, 5], 0.6,
+      [-0.5, -0.5, 5], 0.6,
       new Material([0.5, 1, 0.5], 0, 0.2, 0.1)
     ),
     new Sphere(
-      [-0.9, -0.6, 4], 0.4,
+      [0.6, -0.6, 4], 0.4,
       new Material([0.5, 0.5, 1], 0, 1, 0)
     ),
     new Sphere(
-      [-0.2, -0.7, 3.8], 0.3,
+      [1.3, -0.7, 3.8], 0.3,
       new Material([1, 1, 1], 0, 0, 1)
     )
   ]
@@ -65,6 +66,7 @@ export class SceneCanvasComponent implements OnInit {
       { name: "canvas", array: new Float32Array([this.canvas.width, this.canvas.height]) },
       { name: "target_frames", array: new Float32Array([this.targetFrames]) },
       { name: "sphere_count", array: new Float32Array([this.spheres.length]) },
+      { name: "scene_transform", array: new Float32Array(this.getSceneTransform()) },
     ]
     let storage = [
       { name: "spheres", array: this.shaderService.flattenSpheres(this.spheres) }
@@ -128,6 +130,12 @@ export class SceneCanvasComponent implements OnInit {
     renderPass.setPipeline(pipeline)
     renderPass.draw(6)
     renderPass.end()
+  }
+
+  getSceneTransform() {
+    let transform = mat4.create()
+    mat4.translate(transform, transform, [-0.5, 0, -1])
+    return transform
   }
 
   createRayBuffers(device: GPUDevice) {

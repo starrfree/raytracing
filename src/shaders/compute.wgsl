@@ -3,9 +3,10 @@
 @group(0) @binding(2) var<uniform> canvas: vec2f;
 @group(0) @binding(3) var<uniform> target_frames: f32;
 @group(0) @binding(4) var<uniform> sphere_count: f32;
-@group(0) @binding(5) var<storage> spheres: array<Sphere>;
-@group(0) @binding(6) var<storage> colorsIn: array<vec4f>;
-@group(0) @binding(7) var<storage, read_write> colorsOut: array<vec4f>;
+@group(0) @binding(5) var<uniform> scene_transform: mat4x4f;
+@group(0) @binding(6) var<storage> spheres: array<Sphere>;
+@group(0) @binding(7) var<storage> colorsIn: array<vec4f>;
+@group(0) @binding(8) var<storage, read_write> colorsOut: array<vec4f>;
 
 struct Ray {
   origin: vec3f,
@@ -102,7 +103,9 @@ fn spheres_intersect(ray: Ray) -> HitInfo {
   var closest_hit: HitInfo;
   var found = false;
   for (var i = 0; i < i32(sphere_count); i++) {
-    let hit = sphere_intersect(ray, spheres[i]);
+    var sphere = spheres[i];
+    sphere.center = (scene_transform * vec4f(sphere.center, 1)).xyz;
+    let hit = sphere_intersect(ray, sphere);
     if (hit.hit) {
       if (!found || hit.distance < closest_hit.distance) {
         closest_hit = hit;
