@@ -2,8 +2,10 @@
 @group(0) @binding(1) var<uniform> grid: vec2f;
 @group(0) @binding(2) var<uniform> canvas: vec2f;
 @group(0) @binding(3) var<uniform> target_frames: f32;
-@group(0) @binding(4) var<storage> colorsIn: array<vec4f>;
-@group(0) @binding(5) var<storage, read_write> colorsOut: array<vec4f>;
+@group(0) @binding(4) var<uniform> sphere_count: f32;
+@group(0) @binding(5) var<storage> spheres: array<Sphere>;
+@group(0) @binding(6) var<storage> colorsIn: array<vec4f>;
+@group(0) @binding(7) var<storage, read_write> colorsOut: array<vec4f>;
 
 struct Ray {
   origin: vec3f,
@@ -20,17 +22,17 @@ struct HitInfo {
   material: Material,
 }
 
-struct Material {
-  color: vec3f,
-  emission: f32,
-  roughness: f32,
-  metalic: f32,
-}
-
 struct Sphere {
   center: vec3f,
   radius: f32,
   material: Material,
+}
+
+struct Material {
+  color: vec3f,
+  emission: f32,
+  roughness: f32,
+  specular_probability: f32,
 }
 
 struct Random {
@@ -42,36 +44,6 @@ const max_bounces = 1000;
 const ray_count = 10;
 
 const PI = 3.1415926535897932384626433832795;
-const sphere_count = 6;
-const spheres = array(
-  Sphere(vec3f(3, 2, 2), 2, Material(vec3f(1, 1, 1), 1, 0, 0)),
-  Sphere(vec3f(0, -21, 5), 20, Material(vec3f(1, 1, 1), 0, 0.8, 0)),
-  Sphere(vec3f(0, 0, 5), 1, Material(vec3f(1, 0.5, 0.5), 0, 0.8, 0)),
-  Sphere(vec3f(-2, -0.5, 5), 0.6, Material(vec3f(0.5, 1, 0.5), 0, 0.8, 0)),
-  Sphere(vec3f(-0.9, -0.6, 4), 0.4, Material(vec3f(0.5, 0.5, 1), 0, 0.8, 0)),
-  Sphere(vec3f(-0.2, -0.7, 3.8), 0.3, Material(vec3f(1, 1, 1), 0, 0, 0)),
-);
-
-// const sphere_count = 6;
-// const spheres = array(
-//   Sphere(vec3f(3, 2, 2), 2, Material(vec3f(1, 1, 1), 0.0)),
-//   Sphere(vec3f(0, -21, 5), 20, Material(vec3f(1, 1, 1), 0)),
-//   Sphere(vec3f(0, 0, 5), 1, Material(vec3f(1, 0.5, 0.5), 0)),
-//   Sphere(vec3f(-2, -0.5, 5), 0.6, Material(vec3f(0.5, 1, 0.5), 0)),
-//   Sphere(vec3f(-0.9, -0.65, 4), 0.4, Material(vec3f(0.5, 0.5, 1), 0)),
-//   Sphere(vec3f(-1.1, -0.7, 5), 0.2, Material(vec3f(1, 1, 1), 2)),
-// );
-
-// const sphere_count = 7;
-// const spheres = array(
-//   Sphere(vec3f(-1, 1.1, 5), 0.2, Material(vec3f(1, 1, 1), 5)),
-//   Sphere(vec3f(1, 1.1, 5), 0.2, Material(vec3f(1, 1, 1), 5)),
-//   Sphere(vec3f(-3, 0, 5), 2, Material(vec3f(0.5, 1, 0.5), 0)),
-//   Sphere(vec3f(3, 0, 5), 2, Material(vec3f(1, 0.5, 0.5), 0)),
-//   Sphere(vec3f(0, -3, 5), 2, Material(vec3f(1), 0)),
-//   Sphere(vec3f(0, 3, 5), 2, Material(vec3f(1), 0)),
-//   Sphere(vec3f(0, 0, 5), 0.5, Material(vec3f(1, 1, 1), 0)),
-// );
 
 @compute
 @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE)
@@ -96,7 +68,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     ray.light = vec3f(0);
 
     for (var bounce = 0; bounce <= max_bounces; bounce++) {
-      var hit = intersect_spheres(ray);
+      var hit = spheres_intersect(ray);
       if (hit.hit) {
         ray.origin = hit.position;
         let seed = ((index + u32(time * grid.x * grid.y)) * u32(ray_count) + u32(i)) * u32(max_bounces) + u32(bounce);
@@ -119,10 +91,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   colorsOut[index] = vec4f(color, 1.0);
 }
 
-fn intersect_spheres(ray: Ray) -> HitInfo {
+fn spheres_intersect(ray: Ray) -> HitInfo {
   var closest_hit: HitInfo;
   var found = false;
-  for (var i = 0; i < sphere_count; i++) {
+  for (var i = 0; i < i32(sphere_count); i++) {
     let hit = sphere_intersect(ray, spheres[i]);
     if (hit.hit) {
       if (!found || hit.distance < closest_hit.distance) {

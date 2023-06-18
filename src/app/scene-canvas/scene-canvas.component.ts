@@ -1,5 +1,6 @@
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { ShaderService } from '../shader.service';
+import { Sphere, Material } from 'src/types/graphics';
 
 @Component({
   selector: 'app-scene-canvas',
@@ -14,6 +15,33 @@ export class SceneCanvasComponent implements OnInit {
   raysPerPixel: number = 2
   computesPerFrame: number = 1
   targetFrames: number = 200
+  
+  spheres: Sphere[] = [
+    new Sphere(
+      [3, 2, 2], 2,
+      new Material([1, 1, 1], 1, 0, 0)
+    ),
+    new Sphere(
+      [0, -21, 5], 20,
+      new Material([1, 1, 1], 0, 0.8, 0)
+    ),
+    new Sphere(
+      [0, 0, 5], 1,
+      new Material([1, 0.5, 0.5], 0, 0.8, 0)
+    ),
+    new Sphere(
+      [-2, -0.5, 5], 0.6,
+      new Material([0.5, 1, 0.5], 0, 0.8, 0)
+    ),
+    new Sphere(
+      [-0.9, -0.6, 4], 0.4,
+      new Material([0.5, 0.5, 1], 0, 0.8, 0)
+    ),
+    new Sphere(
+      [-0.2, -0.7, 3.8], 0.3,
+      new Material([1, 1, 1], 0, 0, 0)
+    )
+  ]
 
   constructor(private shaderService: ShaderService) { }
 
@@ -36,10 +64,15 @@ export class SceneCanvasComponent implements OnInit {
       { name: "grid", array: new Float32Array([this.canvas.width * this.raysPerPixel, this.canvas.height * this.raysPerPixel]) },
       { name: "canvas", array: new Float32Array([this.canvas.width, this.canvas.height]) },
       { name: "target_frames", array: new Float32Array([this.targetFrames]) },
+      { name: "sphere_count", array: new Float32Array([this.spheres.length]) },
     ]
-    let uniformBuffers = this.createUniformBuffers(device, uniforms)
+    let storage = [
+      { name: "spheres", array: this.shaderService.flattenSpheres(this.spheres) }
+    ]
+    let uniformBuffers = this.shaderService.createUniformBuffers(device, uniforms)
+    let storageBuffers = this.shaderService.createStorageBuffers(device, storage)
     let rayBuffers = this.createRayBuffers(device)
-    let bindings = this.getBindGroups(device, uniformBuffers, rayBuffers as [GPUBuffer, GPUBuffer])
+    let bindings = this.getBindGroups(device, uniformBuffers, storageBuffers, rayBuffers as [GPUBuffer, GPUBuffer])
     let computePipeline = this.createComputePipeline(device, computeShaderModule, bindings.layout)
     let vertexBuffer = this.createVertexBuffer(device)
     let renderPipeline = this.createRenderPipeline(device, canvasFormat, renderShaderModule, bindings.layout)
@@ -97,41 +130,13 @@ export class SceneCanvasComponent implements OnInit {
     renderPass.end()
   }
 
-  createUniformBuffers(device: GPUDevice, uniforms: { name: string, array: Float32Array }[]) {
-    let buffers: GPUBuffer[] = []
-    uniforms.forEach((uniform, i) => {
-      let buffer = device.createBuffer({
-        label: `uniform ${uniform.name}`,
-        size: uniform.array.byteLength,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      })
-      device.queue.writeBuffer(buffer, 0, uniform.array)
-      buffers.push(buffer)
-    })
-    return buffers
-  }
-
   createRayBuffers(device: GPUDevice) {
     let width = this.canvas.width
     let height = this.canvas.height
     let raysPerRow = width * this.raysPerPixel
     let raysPerCol = height * this.raysPerPixel
     let rays = new Float32Array(raysPerRow * raysPerCol * 4)
-    let storage = [
-      device.createBuffer({
-        label: "rays 1",
-        size: rays.byteLength,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      }),
-      device.createBuffer({
-        label: "rays 2",
-        size: rays.byteLength,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      })
-    ]
-    device.queue.writeBuffer(storage[0], 0, rays)
-    device.queue.writeBuffer(storage[1], 0, rays)
-    return storage
+    return this.shaderService.createStorageBuffers(device, [{ name: "rays 1", array: rays }, { name: "rays 2", array: rays }])
   }
 
   createVertexBuffer(device: GPUDevice) {
@@ -153,7 +158,7 @@ export class SceneCanvasComponent implements OnInit {
     return buffer
   }
 
-  getBindGroups(device: GPUDevice, uniformBuffers: GPUBuffer[], rayBuffers: [GPUBuffer, GPUBuffer]) {
+  getBindGroups(device: GPUDevice, uniformBuffers: GPUBuffer[], storageBuffers: GPUBuffer[], rayBuffers: [GPUBuffer, GPUBuffer]) {
     let layoutEntries: GPUBindGroupLayoutEntry[] = []
     uniformBuffers.forEach((buffer, i) => {
       layoutEntries.push({
@@ -162,13 +167,20 @@ export class SceneCanvasComponent implements OnInit {
         buffer: {}
       })
     })
+    storageBuffers.forEach((buffer, i) => {
+      layoutEntries.push({
+        binding: uniformBuffers.length + i,
+        visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE,
+        buffer: {type: 'read-only-storage'}
+      })
+    })
     layoutEntries.push({
-      binding: uniformBuffers.length,
+      binding: uniformBuffers.length + storageBuffers.length,
       visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE,
       buffer: {type: 'read-only-storage'}
     })
     layoutEntries.push({
-      binding: uniformBuffers.length + 1,
+      binding: uniformBuffers.length + storageBuffers.length + 1,
       visibility: GPUShaderStage.COMPUTE,
       buffer: {type: 'storage'}
     })
@@ -184,12 +196,18 @@ export class SceneCanvasComponent implements OnInit {
         resource: { buffer: buffer }
       })
     })
+    storageBuffers.forEach((buffer, i) => {
+      bindGroupEntries1.push({
+        binding: uniformBuffers.length + i,
+        resource: { buffer: buffer }
+      })
+    })
     bindGroupEntries1.push({
-      binding: uniformBuffers.length,
+      binding: uniformBuffers.length + storageBuffers.length,
       resource: { buffer: rayBuffers[0] }
     })
     bindGroupEntries1.push({
-      binding: uniformBuffers.length + 1,
+      binding: uniformBuffers.length + storageBuffers.length + 1,
       resource: { buffer: rayBuffers[1] }
     })
     let bindGroupEntries2: GPUBindGroupEntry[] = []
@@ -199,12 +217,18 @@ export class SceneCanvasComponent implements OnInit {
         resource: { buffer: buffer }
       })
     })
+    storageBuffers.forEach((buffer, i) => {
+      bindGroupEntries2.push({
+        binding: uniformBuffers.length + i,
+        resource: { buffer: buffer }
+      })
+    })
     bindGroupEntries2.push({
-      binding: uniformBuffers.length,
+      binding: uniformBuffers.length + storageBuffers.length,
       resource: { buffer: rayBuffers[1] }
     })
     bindGroupEntries2.push({
-      binding: uniformBuffers.length + 1,
+      binding: uniformBuffers.length + storageBuffers.length + 1,
       resource: { buffer: rayBuffers[0] }
     })
     let bindGroups = [

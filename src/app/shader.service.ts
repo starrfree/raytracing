@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
+import { Sphere } from 'src/types/graphics';
 
 @Injectable({
   providedIn: 'root'
@@ -50,5 +51,41 @@ export class ShaderService {
       computeShaderModule: computeShaderModule,
       renderShaderModule: renderShaderModule 
     }
+  }
+
+  createUniformBuffers(device: GPUDevice, uniforms: { name: string, array: Float32Array }[]) {
+    let buffers: GPUBuffer[] = []
+    uniforms.forEach((uniform, i) => {
+      let buffer = device.createBuffer({
+        label: `uniform ${uniform.name}`,
+        size: uniform.array.byteLength,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      })
+      device.queue.writeBuffer(buffer, 0, uniform.array)
+      buffers.push(buffer)
+    })
+    return buffers
+  }
+
+  createStorageBuffers(device: GPUDevice, storage: { name: string, array: Float32Array }[]) {
+    let buffers: GPUBuffer[] = []
+    storage.forEach((storage, i) => {
+      let buffer = device.createBuffer({
+        label: `storage ${storage.name}`,
+        size: storage.array.byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      })
+      device.queue.writeBuffer(buffer, 0, storage.array)
+      buffers.push(buffer)
+    })
+    return buffers
+  }
+
+  flattenSpheres(spheres: Sphere[]) {
+    let flatSpheres: number[] = []
+    for (let sphere of spheres) {
+      flatSpheres.push(...sphere.flat)
+    }
+    return new Float32Array(flatSpheres)
   }
 }
