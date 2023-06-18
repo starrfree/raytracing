@@ -11,9 +11,9 @@ export class SceneCanvasComponent implements OnInit {
   get canvas(): HTMLCanvasElement {
     return this.canvasElement.nativeElement
   }
-  raysPerPixel: number = 1
+  raysPerPixel: number = 2
   computesPerFrame: number = 1
-  targetFrames: number = 1
+  targetFrames: number = 200
 
   constructor(private shaderService: ShaderService) { }
 
@@ -64,7 +64,7 @@ export class SceneCanvasComponent implements OnInit {
 
   frame(device: GPUDevice, context: GPUCanvasContext, computePipeline: GPUComputePipeline, renderPipeline: GPURenderPipeline, vertexBuffer: GPUBuffer, bindGroups: GPUBindGroup[], uniformBuffers: GPUBuffer[], params: { step: number }) {
     let encoder = device.createCommandEncoder()
-    device.queue.writeBuffer(uniformBuffers[0], 0, new Float32Array([params.step / this.targetFrames]))
+    device.queue.writeBuffer(uniformBuffers[0], 0, new Float32Array([params.step]))
     this.compute(encoder, computePipeline, bindGroups[params.step % 2])
     params.step++
     this.render(encoder, renderPipeline, bindGroups[params.step % 2], context, vertexBuffer)

@@ -23,6 +23,8 @@ struct HitInfo {
 struct Material {
   color: vec3f,
   emission: f32,
+  roughness: f32,
+  metalic: f32,
 }
 
 struct Sphere {
@@ -36,18 +38,29 @@ struct Random {
   seed: u32,
 }
 
-const bounce_count = 3;
-const ray_count = 100;
+const max_bounces = 1000;
+const ray_count = 10;
 
 const PI = 3.1415926535897932384626433832795;
-const sphere_count = 5;
+const sphere_count = 6;
 const spheres = array(
-  Sphere(vec3f(3, 2, 2), 2, Material(vec3f(1, 1, 1), 1)),
-  Sphere(vec3f(0, -21, 5), 20, Material(vec3f(1, 1, 1), 0)),
-  Sphere(vec3f(0, 0, 5), 1, Material(vec3f(1, 0.5, 0.5), 0)),
-  Sphere(vec3f(-2, -0.5, 5), 0.6, Material(vec3f(0.5, 1, 0.5), 0)),
-  Sphere(vec3f(-0.9, -0.6, 4), 0.4, Material(vec3f(0.5, 0.5, 1), 0)),
+  Sphere(vec3f(3, 2, 2), 2, Material(vec3f(1, 1, 1), 1, 0, 0)),
+  Sphere(vec3f(0, -21, 5), 20, Material(vec3f(1, 1, 1), 0, 0.8, 0)),
+  Sphere(vec3f(0, 0, 5), 1, Material(vec3f(1, 0.5, 0.5), 0, 0.8, 0)),
+  Sphere(vec3f(-2, -0.5, 5), 0.6, Material(vec3f(0.5, 1, 0.5), 0, 0.8, 0)),
+  Sphere(vec3f(-0.9, -0.6, 4), 0.4, Material(vec3f(0.5, 0.5, 1), 0, 0.8, 0)),
+  Sphere(vec3f(-0.2, -0.7, 3.8), 0.3, Material(vec3f(1, 1, 1), 0, 0, 0)),
 );
+
+// const sphere_count = 6;
+// const spheres = array(
+//   Sphere(vec3f(3, 2, 2), 2, Material(vec3f(1, 1, 1), 0.0)),
+//   Sphere(vec3f(0, -21, 5), 20, Material(vec3f(1, 1, 1), 0)),
+//   Sphere(vec3f(0, 0, 5), 1, Material(vec3f(1, 0.5, 0.5), 0)),
+//   Sphere(vec3f(-2, -0.5, 5), 0.6, Material(vec3f(0.5, 1, 0.5), 0)),
+//   Sphere(vec3f(-0.9, -0.65, 4), 0.4, Material(vec3f(0.5, 0.5, 1), 0)),
+//   Sphere(vec3f(-1.1, -0.7, 5), 0.2, Material(vec3f(1, 1, 1), 2)),
+// );
 
 // const sphere_count = 7;
 // const spheres = array(
@@ -82,13 +95,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     ray.color = vec3f(1);
     ray.light = vec3f(0);
 
-    for (var bounce = 0; bounce <= bounce_count; bounce++) {
+    for (var bounce = 0; bounce <= max_bounces; bounce++) {
       var hit = intersect_spheres(ray);
       if (hit.hit) {
         ray.origin = hit.position;
-        let seed = ((index + u32(time * grid.x * grid.y)) * u32(ray_count) + u32(i)) * u32(bounce_count) + u32(bounce);
-        ray.direction = random_on_hemisphere(seed, hit.normal);
+        let seed = ((index + u32(time * grid.x * grid.y)) * u32(ray_count) + u32(i)) * u32(max_bounces) + u32(bounce);
 
+        ray.direction = random_on_hemisphere(seed, hit.normal) * hit.material.roughness + (1 - hit.material.roughness) * reflect(ray.direction, hit.normal);
         ray.light += hit.material.emission * ray.color;
         ray.color *= hit.material.color;
         if (hit.material.emission >= 1) {
