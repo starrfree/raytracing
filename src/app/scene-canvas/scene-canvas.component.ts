@@ -35,12 +35,8 @@ export class SceneCanvasComponent implements OnInit {
       [-0.5, -0.5, 5], 0.6,
       new Material([0.5, 1, 0.5], 0, 0.2, 0.1)
     ),
-    // new Sphere(
-    //   [0.6, -0.6, 4], 0.4,
-    //   new Material([0.5, 0.5, 1], 0, 1, 0)
-    // ),
     new Sphere(
-      [1.3, -0.7, 3.8], 0.3,
+      [1.3, -0.75, 3.8], 0.3,
       new Material([1, 1, 1], 0, 0, 1)
     )
   ]
@@ -56,8 +52,8 @@ export class SceneCanvasComponent implements OnInit {
   }
 
   resizeCanvas() {
-    this.canvas.width = this.canvas.clientWidth
-    this.canvas.height = this.canvas.clientHeight
+    this.canvas.width = this.canvas.clientWidth / 2
+    this.canvas.height = this.canvas.clientHeight / 2
   }
   async ngAfterViewInit() {
     this.resizeCanvas()
