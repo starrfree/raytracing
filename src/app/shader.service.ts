@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { Sphere, Triangle } from 'src/types/graphics';
+import { Mesh, Sphere, Triangle } from 'src/types/graphics';
 
 @Injectable({
   providedIn: 'root'
@@ -81,7 +81,7 @@ export class ShaderService {
     return buffers
   }
 
-  flatten(shapes: (Sphere | Triangle)[]) {
+  flatten(shapes: (Sphere | Triangle | Mesh)[]) {
     let flat: number[] = []
     for (let shape of shapes) {
       flat.push(...shape.flat)

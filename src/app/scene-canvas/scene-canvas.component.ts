@@ -1,6 +1,6 @@
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { ShaderService } from '../shader.service';
-import { Sphere, Material, Triangle } from 'src/types/graphics';
+import { Sphere, Material, Triangle, Mesh } from 'src/types/graphics';
 import { mat4, vec3 } from 'gl-matrix'
 import * as Utils from 'src/assets/utils/graphics';
 
@@ -40,13 +40,15 @@ export class SceneCanvasComponent implements OnInit {
       new Material([1, 1, 1], 0, 0, 1)
     )
   ]
+  
+  triangle: Triangle[] = []
+  meshes: Mesh[] = []
 
-  triangle: Triangle[] = [
-    // new Triangle([0, 0, 0], [0, 0, 0], [0, 0, 0], new Material([1, 1, 1], 0, 0, 0)),
-    ...Utils.createCube([0.5, -0.7, 4], [-0.07, 0.4, 0], 0.7, new Material([0.5, 0.5, 1], 0, 1, 0))
-  ]
-
-  constructor(private shaderService: ShaderService) { }
+  constructor(private shaderService: ShaderService) {
+    let cube = Utils.createCube([0.5, -0.7, 4], [-0.07, 0.4, 0], 0.7, new Material([0.5, 0.5, 1], 0, 1, 0))
+    this.triangle.push(...cube.triangles)
+    this.meshes.push(cube.mesh)
+  }
 
   ngOnInit(): void {
   }
@@ -68,12 +70,13 @@ export class SceneCanvasComponent implements OnInit {
       { name: "canvas", array: new Float32Array([this.canvas.width, this.canvas.height]) },
       { name: "target_frames", array: new Float32Array([this.targetFrames]) },
       { name: "sphere_count", array: new Float32Array([this.spheres.length]) },
-      { name: "triangle_count", array: new Float32Array([this.triangle.length]) },
+      { name: "mesh_count", array: new Float32Array([this.meshes.length]) },
       { name: "scene_transform", array: new Float32Array(this.getSceneTransform()) },
     ]
     let storage = [
       { name: "spheres", array: this.shaderService.flatten(this.spheres) },
       { name: "triangles", array: this.shaderService.flatten(this.triangle) },
+      { name: "meshes", array: this.shaderService.flatten(this.meshes) },
     ]
     let uniformBuffers = this.shaderService.createUniformBuffers(device, uniforms)
     let storageBuffers = this.shaderService.createStorageBuffers(device, storage)

@@ -10,7 +10,7 @@ struct VertexOutput {
 @group(0) @binding(1) var<uniform> grid: vec2f;
 @group(0) @binding(2) var<uniform> canvas: vec2f;
 @group(0) @binding(3) var<uniform> target_frames: f32;
-@group(0) @binding(9) var<storage> colors: array<vec4f>;
+@group(0) @binding(10) var<storage> colors: array<vec4f>;
 
 @vertex
 fn vertexMain(input: VertexInput) -> VertexOutput {

@@ -3,12 +3,13 @@
 @group(0) @binding(2) var<uniform> canvas: vec2f;
 @group(0) @binding(3) var<uniform> target_frames: f32;
 @group(0) @binding(4) var<uniform> sphere_count: f32;
-@group(0) @binding(5) var<uniform> triangle_count: f32;
+@group(0) @binding(5) var<uniform> mesh_count: f32;
 @group(0) @binding(6) var<uniform> scene_transform: mat4x4f;
 @group(0) @binding(7) var<storage> spheres: array<Sphere>;
 @group(0) @binding(8) var<storage> triangles: array<Triangle>;
-@group(0) @binding(9) var<storage> colorsIn: array<vec4f>;
-@group(0) @binding(10) var<storage, read_write> colorsOut: array<vec4f>;
+@group(0) @binding(9) var<storage> meshes: array<Mesh>;
+@group(0) @binding(10) var<storage> colorsIn: array<vec4f>;
+@group(0) @binding(11) var<storage, read_write> colorsOut: array<vec4f>;
 
 struct Ray {
   origin: vec3f,
@@ -35,6 +36,12 @@ struct Triangle {
   v0: vec3f,
   v1: vec3f,
   v2: vec3f,
+}
+
+struct Mesh {
+  triangle_start: f32,
+  triangle_count: f32,
+  bounding_box: array<vec3f, 2>,
   material: Material,
 }
 
@@ -122,12 +129,11 @@ fn intersect(ray: Ray) -> HitInfo {
       }
     }
   }
-  for (var i = 0; i < i32(triangle_count); i++) {
-    var triangle = triangles[i];
-    triangle.v0 = (scene_transform * vec4f(triangle.v0, 1)).xyz;
-    triangle.v1 = (scene_transform * vec4f(triangle.v1, 1)).xyz;
-    triangle.v2 = (scene_transform * vec4f(triangle.v2, 1)).xyz;
-    let hit = triangle_intersect(ray, triangle);
+  for (var i = 0; i < i32(mesh_count); i++) {
+    var mesh = meshes[i];
+    mesh.bounding_box[0] = (scene_transform * vec4f(mesh.bounding_box[0], 1)).xyz;
+    mesh.bounding_box[1] = (scene_transform * vec4f(mesh.bounding_box[1], 1)).xyz;
+    let hit = mesh_intersect(ray, mesh);
     if (hit.hit) {
       if (!found || hit.distance < closest_hit.distance) {
         closest_hit = hit;
@@ -159,6 +165,27 @@ fn sphere_intersect(ray: Ray, sphere: Sphere) -> HitInfo {
   return hit;
 }
 
+fn mesh_intersect(ray: Ray, mesh: Mesh) -> HitInfo {
+  var closest_hit: HitInfo;
+  closest_hit.hit = false;
+  if (ray_box_intersect(ray, mesh.bounding_box)) {
+    for (var i = 0; i < i32(mesh.triangle_count); i++) {
+      var triangle = triangles[i + i32(mesh.triangle_start)];
+      triangle.v0 = (scene_transform * vec4f(triangle.v0, 1)).xyz;
+      triangle.v1 = (scene_transform * vec4f(triangle.v1, 1)).xyz;
+      triangle.v2 = (scene_transform * vec4f(triangle.v2, 1)).xyz;
+      var hit = triangle_intersect(ray, triangle);
+      hit.material = mesh.material;
+      if (hit.hit) {
+        if (!closest_hit.hit || hit.distance < closest_hit.distance) {
+          closest_hit = hit;
+        }
+      }
+    }
+  }
+  return closest_hit;
+}
+
 fn triangle_intersect(ray: Ray, triangle: Triangle) -> HitInfo {
   let v0v1 = triangle.v1 - triangle.v0;
   let v0v2 = triangle.v2 - triangle.v0;
@@ -188,8 +215,20 @@ fn triangle_intersect(ray: Ray, triangle: Triangle) -> HitInfo {
   hit.distance = t;
   hit.position = ray.origin + ray.direction * t;
   hit.normal = normalize(cross(v0v1, v0v2));
-  hit.material = triangle.material;
   return hit;
+}
+
+fn ray_box_intersect(ray: Ray, box: array<vec3f, 2>) -> bool {
+  let invdir = vec3f(1) / ray.direction;
+  let t1 = (box[0].x - ray.origin.x) * invdir.x;
+  let t2 = (box[1].x - ray.origin.x) * invdir.x;
+  let t3 = (box[0].y - ray.origin.y) * invdir.y;
+  let t4 = (box[1].y - ray.origin.y) * invdir.y;
+  let t5 = (box[0].z - ray.origin.z) * invdir.z;
+  let t6 = (box[1].z - ray.origin.z) * invdir.z;
+  let tmin = max(max(min(t1, t2), min(t3, t4)), min(t5, t6));
+  let tmax = min(min(max(t1, t2), max(t3, t4)), max(t5, t6));
+  return tmax >= 0 && tmin <= tmax;
 }
 
 fn random(seed: u32) -> f32 {
