@@ -41,14 +41,25 @@ export class SceneCanvasComponent implements OnInit {
     )
   ]
   
-  triangle: Triangle[] = []
-  meshes: Mesh[] = []
-
-  constructor(private shaderService: ShaderService) {
-    let cube = Utils.createCube([0.5, -0.7, 4], [-0.07, 0.4, 0], 0.7, new Material([0.5, 0.5, 1], 0, 1, 0))
-    this.triangle.push(...cube.triangles)
-    this.meshes.push(cube.mesh)
+  objects = [
+    Utils.createCube([0.1, 0.7, 4], [0.2, 0.4, 0], 0.7, new Material([1, 1, 1], 0, 0.3, 1)),
+    Utils.createCube([0.5, -0.7, 4], [-0.07, 0.4, 0], 0.7, new Material([0.5, 0.5, 1], 0, 1, 0)),
+  ]
+  get triangle(): Triangle[] {
+    return this.objects.flatMap(o => o.triangles)
   }
+  get meshes(): Mesh[] {
+    let meshes: Mesh[] = []
+    let triangle_count = 0
+    this.objects.forEach(object => {
+      object.mesh.triangle_start = Float32Array.from([triangle_count])
+      meshes.push(object.mesh)
+      triangle_count += object.mesh.triangle_count[0]
+    })
+    return meshes
+  }
+
+  constructor(private shaderService: ShaderService) {}
 
   ngOnInit(): void {
   }
