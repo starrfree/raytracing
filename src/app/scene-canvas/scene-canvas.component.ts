@@ -2,7 +2,9 @@ import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { ShaderService } from '../shader.service';
 import { Sphere, Material, Triangle, Mesh } from 'src/types/graphics';
 import { mat4, vec3 } from 'gl-matrix'
-import * as Utils from 'src/assets/utils/graphics';
+import * as GraphicUtils from 'src/assets/utils/graphics';
+import { firstValueFrom } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
 
 @Component({
   selector: 'app-scene-canvas',
@@ -16,7 +18,7 @@ export class SceneCanvasComponent implements OnInit {
   }
   raysPerPixel: number = 2
   computesPerFrame: number = 1
-  targetFrames: number = 300
+  targetFrames: number = 20
   
   spheres: Sphere[] = [
     new Sphere(
@@ -41,9 +43,9 @@ export class SceneCanvasComponent implements OnInit {
     )
   ]
   
-  objects = [
-    Utils.createCube([0.1, 0.7, 4], [0.2, 0.4, 0], 0.7, new Material([1, 1, 1], 0, 0.3, 1)),
-    Utils.createCube([0.5, -0.7, 4], [-0.07, 0.4, 0], 0.7, new Material([0.5, 0.5, 1], 0, 1, 0)),
+  objects: {triangles: Triangle[], mesh: Mesh}[] = [
+    GraphicUtils.createCube([0.5, -0.7, 3.8], [-0.07, 0.4, 0], 0.7, new Material([0.5, 0.5, 1], 0, 1, 0)),
+    // GraphicUtils.createCube([0.5, -0.2, 4], [-0.07, 0.9, 0], 0.3, new Material([1, 0.9, 0.4], 0, 1, 0)),
   ]
   get triangle(): Triangle[] {
     return this.objects.flatMap(o => o.triangles)
@@ -59,7 +61,7 @@ export class SceneCanvasComponent implements OnInit {
     return meshes
   }
 
-  constructor(private shaderService: ShaderService) {}
+  constructor(private http: HttpClient, private shaderService: ShaderService) {}
 
   ngOnInit(): void {
   }
@@ -69,6 +71,11 @@ export class SceneCanvasComponent implements OnInit {
     this.canvas.height = this.canvas.clientHeight / 2
   }
   async ngAfterViewInit() {
+    let mesh = await GraphicUtils.fileToMesh(
+      await firstValueFrom(this.http.get('assets/meshes/monkey.obj', {responseType: 'text'})),
+      [0.5, -0.22, 3.8], [0.75, Math.PI, -0.07], 1.4, new Material([1, 1, 1], 0, 1, 0)
+    )
+    this.objects.push(mesh)
     this.resizeCanvas()
     await this.shaderService.getCode()
     let prop = await this.shaderService.initWebGPUContext(this.canvas)

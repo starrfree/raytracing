@@ -131,8 +131,8 @@ fn intersect(ray: Ray) -> HitInfo {
   }
   for (var i = 0; i < i32(mesh_count); i++) {
     var mesh = meshes[i];
-    mesh.bounding_box[0] = (scene_transform * vec4f(mesh.bounding_box[0], 1)).xyz;
-    mesh.bounding_box[1] = (scene_transform * vec4f(mesh.bounding_box[1], 1)).xyz;
+    mesh.bounding_box[0] = transform(mesh.bounding_box[0]);
+    mesh.bounding_box[1] = transform(mesh.bounding_box[1]);
     let hit = mesh_intersect(ray, mesh);
     if (hit.hit) {
       if (!found || hit.distance < closest_hit.distance) {
@@ -171,9 +171,9 @@ fn mesh_intersect(ray: Ray, mesh: Mesh) -> HitInfo {
   if (ray_box_intersect(ray, mesh.bounding_box)) {
     for (var i = 0; i < i32(mesh.triangle_count); i++) {
       var triangle = triangles[i + i32(mesh.triangle_start)];
-      triangle.v0 = (scene_transform * vec4f(triangle.v0, 1)).xyz;
-      triangle.v1 = (scene_transform * vec4f(triangle.v1, 1)).xyz;
-      triangle.v2 = (scene_transform * vec4f(triangle.v2, 1)).xyz;
+      triangle.v0 = transform(triangle.v0);
+      triangle.v1 = transform(triangle.v1);
+      triangle.v2 = transform(triangle.v2);
       var hit = triangle_intersect(ray, triangle);
       hit.material = mesh.material;
       if (hit.hit) {
@@ -229,6 +229,10 @@ fn ray_box_intersect(ray: Ray, box: array<vec3f, 2>) -> bool {
   let tmin = max(max(min(t1, t2), min(t3, t4)), min(t5, t6));
   let tmax = min(min(max(t1, t2), max(t3, t4)), max(t5, t6));
   return tmax >= 0 && tmin <= tmax;
+}
+
+fn transform(vect: vec3f) -> vec3f {
+  return (scene_transform * vec4f(vect, 1)).xyz;
 }
 
 fn random(seed: u32) -> f32 {
