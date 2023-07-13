@@ -16,36 +16,30 @@ export class SceneCanvasComponent implements OnInit {
   get canvas(): HTMLCanvasElement {
     return this.canvasElement.nativeElement
   }
-  raysPerPixel: number = 2
+  raysPerPixel: number = 1
   computesPerFrame: number = 1
-  targetFrames: number = 20
+  targetFrames: number = 1000
   
   spheres: Sphere[] = [
-    new Sphere(
-      [4.5, 2, 2], 2,
-      new Material([1, 1, 1], 1, 0, 0)
-    ),
-    new Sphere(
-      [1.5, -21, 5], 20,
-      new Material([1, 1, 1], 0, 0.8, 1)
-    ),
-    new Sphere(
-      [1.5, 0, 5], 1,
-      new Material([1, 0.5, 0.5], 0, 0, 0.1)
-    ),
-    new Sphere(
-      [-0.5, -0.5, 5], 0.6,
-      new Material([0.5, 1, 0.5], 0, 0.2, 0.1)
-    ),
-    new Sphere(
-      [1.3, -0.75, 3.8], 0.3,
-      new Material([1, 1, 1], 0, 0, 1)
-    )
+    // new Sphere([0, 0, -10], 0, new Material([0, 0, 0], 0, 0, 0)),
+    // new Sphere([0, -0.3, 3], 0.4, new Material([1, 1, 1], 0, 1, 0)),
+    new Sphere([-0.4, -0.6, 3.3], 0.4, new Material([1, 1, 1], 0, 1, 0)),
+    new Sphere([-0.55, -0.8, 2.8], 0.2, new Material([0.5, 0.5, 1], 0, 0.2, 0.1)),
+    new Sphere([0.4, -0.7, 3.3], 0.3, new Material([0.5, 0.5, 1], 0, 0, 1)),
+    new Sphere([-0.07, -0.8, 2.52], 0.2, new Material([0, 0, 0], 0, 0.3, 0.3)),
+    new Sphere([0.5, -0.75, 2.5], 0.25, new Material([0.5, 0.5, 1], 0, 0, 0.2)),
   ]
   
   objects: {triangles: Triangle[], mesh: Mesh}[] = [
-    GraphicUtils.createCube([0.5, -0.7, 3.8], [-0.07, 0.4, 0], 0.7, new Material([0.5, 0.5, 1], 0, 1, 0)),
-    // GraphicUtils.createCube([0.5, -0.2, 4], [-0.07, 0.9, 0], 0.3, new Material([1, 0.9, 0.4], 0, 1, 0)),
+    GraphicUtils.createQuad([0, 0, 3.75], [0, 0, 0], 2, new Material([0.8, 0.8, 0.8], 0, 1, 0)), // Back
+    // GraphicUtils.createQuad([0, 0, 3.75], [0, 0, 0], 2, new Material([1, 1, 1], 0, 0, 1)), // Back
+    GraphicUtils.createQuad([0, 1, 3], [-Math.PI / 2, 0, 0], 1.5, new Material([1, 1, 1], 0, 1, 0)), // Top
+    GraphicUtils.createQuad([0, -1, 3], [Math.PI / 2, 0, 0], 1.5, new Material([1, 1, 1], 0, 1, 0)), // Bottom
+    GraphicUtils.createQuad([0, 0, 2.25], [0, Math.PI, 0], 2, new Material([0.8, 0.8, 0.8], 0, 1, 0)), // Front
+    // GraphicUtils.createQuad([0, 0, 2.25], [0, Math.PI, 0], 2, new Material([1, 1, 1], 0, 0, 1)), // Front
+    GraphicUtils.createQuad([-0.75, 0, 3], [0, -Math.PI / 2, 0], [1.5, 2, 1.5], new Material([1, 0.3, 0.3], 0, 1, 0)), // Left 
+    GraphicUtils.createQuad([0.75, 0, 3], [0, Math.PI / 2, 0], [1.5, 2, 1.5], new Material([0.3, 1, 0.3], 0, 1, 0)), // Right
+    GraphicUtils.createQuad([0, 0.99, 3], [-Math.PI / 2, 0, 0], 0.5, new Material([1, 1, 1], 2, 1, 0)), // Light
   ]
   get triangle(): Triangle[] {
     return this.objects.flatMap(o => o.triangles)
@@ -67,15 +61,15 @@ export class SceneCanvasComponent implements OnInit {
   }
 
   resizeCanvas() {
-    this.canvas.width = this.canvas.clientWidth / 2
-    this.canvas.height = this.canvas.clientHeight / 2
+    this.canvas.width = this.canvas.clientWidth
+    this.canvas.height = this.canvas.clientHeight
   }
   async ngAfterViewInit() {
-    let mesh = await GraphicUtils.fileToMesh(
-      await firstValueFrom(this.http.get('assets/meshes/monkey.obj', {responseType: 'text'})),
-      [0.5, -0.22, 3.8], [0.75, Math.PI, -0.07], 1.4, new Material([1, 1, 1], 0, 1, 0)
-    )
-    this.objects.push(mesh)
+    // let mesh = await GraphicUtils.fileToMesh(
+    //   await firstValueFrom(this.http.get('assets/meshes/monkey.obj', {responseType: 'text'})),
+    //   [0, -0.2, 3], [0, Math.PI - Math.PI / 6, 0], 1.5, new Material([1, 1, 1], 0, 1, 0)
+    // )
+    // this.objects.push(mesh)
     this.resizeCanvas()
     await this.shaderService.getCode()
     let prop = await this.shaderService.initWebGPUContext(this.canvas)
@@ -161,7 +155,7 @@ export class SceneCanvasComponent implements OnInit {
 
   getSceneTransform() {
     let transform = mat4.create()
-    mat4.translate(transform, transform, [-0.5, 0, -1])
+    mat4.translate(transform, transform, [0, 0, -0.65])
     return transform
   }
 

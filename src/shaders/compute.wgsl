@@ -57,7 +57,7 @@ struct Random {
   seed: u32,
 }
 
-const max_bounces = 10;
+const max_bounces = 30;
 const ray_count = 10;
 
 const PI = 3.1415926535897932384626433832795;
@@ -78,9 +78,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   var color = vec3f(0);
   for (var i = 0; i <= ray_count; i++) {
+    let ray_seed = (index + u32(time * grid.x * grid.y)) * u32(ray_count) + u32(i);
     var ray: Ray;
     ray.origin = vec3f(0);
-    ray.direction = normalize(vec3f(x, y, 4));
+    ray.direction = normalize(vec3f(x, y, 4) + random_on_disk(ray_seed, 0.01));
     ray.color = vec3f(1);
     ray.light = vec3f(0);
 
@@ -88,7 +89,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       var hit = intersect(ray);
       if (hit.hit) {
         ray.origin = hit.position;
-        let seed = ((index + u32(time * grid.x * grid.y)) * u32(ray_count) + u32(i)) * u32(max_bounces) + u32(bounce);
+        let seed = ray_seed * u32(max_bounces) + u32(bounce);
 
         let is_specular = random(seed) > hit.material.specular_probability;
         if (is_specular) {
@@ -99,6 +100,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
         ray.light += hit.material.emission * ray.color;
         if (is_specular) {
           ray.color *= hit.material.color;
+        } else {
+          ray.color *= 0.9;
         }
         if (hit.material.emission >= 1) {
           break;
@@ -193,7 +196,7 @@ fn triangle_intersect(ray: Ray, triangle: Triangle) -> HitInfo {
   let det = dot(v0v1, pvec);
   var hit: HitInfo;
   hit.hit = false;
-  if (det < 0.000001) {
+  if (det < 0.0000000001) {
     return hit;
   }
   let invDet = 1 / det;
@@ -258,4 +261,12 @@ fn random_on_hemisphere(seed: u32, normal: vec3f) -> vec3f {
     r = -r;
   }
   return r;
+}
+
+fn random_on_disk(seed: u32, radius: f32) -> vec3f {
+  var theta = random(2 * seed) * 2 * PI;
+  var r = radius * sqrt(random(2 * seed + 1));
+  var x = r * cos(theta);
+  var y = r * sin(theta);
+  return vec3f(x, y, 0);
 }
